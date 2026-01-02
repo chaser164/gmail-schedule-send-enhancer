@@ -77,7 +77,3 @@ The extension uses a content script that:
 - The extension watches for DOM changes using `MutationObserver` to handle Gmail's dynamic content
 - Button detection uses selectors that may need adjustment as Gmail updates
 - Debug logging can be disabled by setting `CONFIG.debug = false` in `content.js`
-
-## License
-
-MIT
