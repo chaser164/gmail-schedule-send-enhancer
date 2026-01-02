@@ -19,13 +19,6 @@ A Chrome extension that enhances Gmail's schedule send functionality by saving c
 4. Select the `edit-scheduled-gmail` directory
 5. The extension should now be active on Gmail
 
-### Icons Setup
-
-The extension requires icons in the `icons/` directory:
-- `icon16.png` (16x16 pixels)
-- `icon48.png` (48x48 pixels)
-- `icon128.png` (128x128 pixels)
-
 ## Project Structure
 
 ```
