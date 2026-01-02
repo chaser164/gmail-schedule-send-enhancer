@@ -1,0 +1,81 @@
+/* Styles for Edit Scheduled Gmail extension */
+
+.edit-scheduled-send-btn {
+  /* Match Gmail's button styling */
+  font-family: 'Google Sans', Roboto, RobotoDraft, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: #1a73e8;
+  background: transparent;
+  border: none;
+  padding: 8px 16px;
+  margin-left: 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  line-height: 20px;
+  text-align: center;
+  vertical-align: middle;
+  outline: none;
+  display: inline-block;
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.edit-scheduled-send-btn:hover {
+  background-color: rgba(26, 115, 232, 0.08);
+}
+
+.edit-scheduled-send-btn:active {
+  background-color: rgba(26, 115, 232, 0.12);
+}
+
+.edit-scheduled-send-btn:focus {
+  background-color: rgba(26, 115, 232, 0.08);
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.edit-scheduled-send-btn:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+/* Styles for date picker menu items */
+.ZkmAeb[role="menu"] .Az[role="menuitem"] .Ay {
+  text-align: right;
+  min-width: 140px;
+  padding-right: 36px; /* Reserve space for refresh button on random option (24px button + 12px gap) */
+  position: relative;
+}
+
+/* Random time refresh button styling */
+.random-time-refresh-btn {
+  position: absolute;
+  right: 4px; /* Position 4px from right - less space between datetime and button */
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  font-size: 19.2px; /* 20% bigger than 16px */
+  opacity: 0.6;
+  display: inline-block;
+  transition: opacity 0.2s, box-shadow 0.2s;
+  user-select: none;
+  width: 24px; /* 20% bigger than 20px */
+  height: 24px; /* Added for better hit area */
+  text-align: center;
+  line-height: 24px;
+  border-radius: 50%;
+}
+
+.random-time-refresh-btn:hover {
+  opacity: 1;
+  outline: 1px solid rgba(128, 128, 128, 0.5); /* Grey outline */
+  outline-offset: 2px;
+}
+
+.random-time-refresh-btn:active {
+  outline: 1px solid rgba(128, 128, 128, 0.7); /* Slightly darker grey on click */
+  outline-offset: 2px;
+}
