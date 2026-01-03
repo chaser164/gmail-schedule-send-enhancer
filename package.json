@@ -1,0 +1,16 @@
+{
+  "name": "gmail-schedule-send-enhancer",
+  "version": "1.0.0",
+  "description": "A Chrome extension that enhances Gmail's schedule send functionality by saving cancelled scheduled times and adding convenient scheduling options to the date picker menu.",
+  "main": "content.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "convert-icon": "node convert-icon.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "sharp": "^0.34.5"
+  }
+}

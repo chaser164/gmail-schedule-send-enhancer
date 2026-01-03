@@ -1,6 +1,5 @@
 // Content script for Edit Scheduled Gmail extension
-// This script saves the scheduled time when Cancel send is clicked,
-// and injects a "Last cancelled send time" option in the date picker menu
+// This script injects custom options into Gmail's schedule send date picker menu
 
 (function() {
   'use strict';
@@ -13,106 +12,91 @@
       subtree: true,
       attributes: true,
       attributeFilter: ['aria-label', 'class']
-    },
-    debug: true // Set to false to disable console logs
+    }
   };
 
   // State management
   let observer = null;
 
   /**
-   * Debug logging helper
-   */
-  function log(...args) {
-    if (CONFIG.debug) {
-      console.log('[Edit Scheduled Gmail]', ...args);
-    }
-  }
-
-  /**
-   * Saves the scheduled time when Cancel send is clicked
-   * @param {string} scheduledTime - The scheduled time string
-   */
-  function saveScheduledTime(scheduledTime) {
-    chrome.storage.local.set({ 'scheduled time': scheduledTime }, () => {
-      if (chrome.runtime.lastError) {
-        log('Error saving scheduled time:', chrome.runtime.lastError);
-      } else {
-        log('Scheduled time saved:', scheduledTime);
-      }
-    });
-  }
-
-  /**
-   * Sets up a click listener on the Cancel send button to save the scheduled time
+   * Simple click listener for cancel send button
    */
   function setupCancelButtonListener() {
-    const cancelButton = findCancelSendButton();
-    if (!cancelButton) {
-      return;
-    }
-
-    // Check if we've already added a listener (avoid duplicates)
-    if (cancelButton.dataset.scheduledTimeListener) {
-      return;
-    }
-
-    cancelButton.dataset.scheduledTimeListener = 'true';
-    
-    // Add click listener that runs before Gmail's handler
-    cancelButton.addEventListener('click', (e) => {
-      log('Cancel send button clicked, saving scheduled time');
+    const clickHandler = (e) => {
+      let target = e.target;
+      let depth = 0;
+      const maxDepth = 10;
+      let cancelButton = null;
       
-      // Find the scheduled time element
-      const scheduledTimeElement = document.querySelector('span.g3[title]');
-      if (scheduledTimeElement) {
-        const scheduledTime = scheduledTimeElement.getAttribute('title');
-        log('Found scheduled time:', scheduledTime);
-        saveScheduledTime(scheduledTime);
-      } else {
-        log('Could not find scheduled time element');
-      }
-    }, true); // Use capture phase to run before Gmail's handler
-  }
-
-  /**
-   * Finds the Cancel send button by locating the span element and returning its parent button
-   * @returns {HTMLElement|null} The Cancel send button or null
-   */
-  function findCancelSendButton() {
-    // Find the span element with the specific Gmail structure
-    const cancelSpan = document.querySelector('span[jsname="V67aGc"], span.mUIrbf-anl');
-    if (!cancelSpan) {
-      return null;
-    }
-
-    const spanText = cancelSpan.textContent?.trim();
-    if (spanText !== 'Cancel send' && !spanText.toLowerCase().includes('cancel')) {
-      return null;
-    }
-
-    // Find the parent element with role="button" or a clickable parent
-    let parent = cancelSpan.parentElement;
-    const maxDepth = 5; // Limit search depth
-    
-    for (let i = 0; i < maxDepth && parent && parent !== document.body; i++) {
-      const role = parent.getAttribute('role');
-      const hasClickHandler = parent.onclick || parent.getAttribute('jsaction');
-      
-      // Return if it's a button or has click handling
-      if (role === 'button' || hasClickHandler) {
-        log('Found Cancel send button');
-        return parent;
+      // Find the cancel send button
+      while (target && depth < maxDepth && target !== document.body) {
+        const text = target.textContent?.trim() || target.getAttribute('aria-label') || '';
+        
+        // Only match exact "Cancel send" text, not partial matches
+        // Also check that it's not our refresh button
+        if (text === 'Cancel send' && 
+            !target.classList.contains('random-time-refresh-btn') &&
+            !target.closest('.random-time-refresh-btn')) {
+          cancelButton = target;
+          break;
+        }
+        
+        target = target.parentElement;
+        depth++;
       }
       
-      parent = parent.parentElement;
-    }
-
-    // Fallback: return the span's immediate parent if no button found
-    log('No button parent found, using span parent');
-    return cancelSpan.parentElement;
+      // If we found the cancel button, handle it
+      if (cancelButton) {
+        // Step 1: Prevent default behavior
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        
+        // Step 2: Capture the timestamp synchronously
+        const scheduledTimeElement = document.querySelector('span.g3[title]');
+        let scheduledTime = null;
+        
+        if (scheduledTimeElement) {
+          // Capture the title value
+          scheduledTime = scheduledTimeElement.getAttribute('title');
+          
+          // Step 3: Parse the date and create ISO format
+          let scheduledTimeISO = null;
+          try {
+            const parsedDate = new Date(scheduledTime);
+            if (!isNaN(parsedDate.getTime())) {
+              scheduledTimeISO = parsedDate.toISOString();
+            }
+          } catch (e) {
+            // Error parsing date, will save string only
+          }
+          
+          // Step 4: Store the captured timestamp in async storage
+          const storageData = { 'scheduled time': scheduledTime };
+          if (scheduledTimeISO) {
+            storageData['scheduled time iso'] = scheduledTimeISO;
+          }
+          
+          chrome.storage.local.set(storageData);
+        }
+        
+        // Step 4: Temporarily remove our listener
+        document.body.removeEventListener('click', clickHandler, true);
+        
+        // Step 5: Programmatically click the original button (without our listener)
+        // Use a small delay to ensure our listener removal has taken effect
+        setTimeout(() => {
+          cancelButton.click();
+          
+          // Step 6: Re-attach our listener after a brief delay
+          setTimeout(() => {
+            document.body.addEventListener('click', clickHandler, true);
+          }, 100);
+        }, 10);
+      }
+    };
+    
+    document.body.addEventListener('click', clickHandler, true);
   }
-
 
   /**
    * Calculates tomorrow morning random time (8-9 AM)
@@ -162,11 +146,8 @@
   function fillDatePickerAndSchedule(targetDate) {
     const pickDateTimeItem = document.querySelector('.ZkmAeb[role="menu"] .AM[role="menuitem"]');
     if (!pickDateTimeItem) {
-      log('Could not find "Pick date & time" item');
       return;
     }
-
-    log('Attempting to use "Pick date & time" flow with date:', targetDate);
     
     // Click to open the date/time picker
     pickDateTimeItem.click();
@@ -177,8 +158,6 @@
         // Find the specific date and time input fields
         const dateInput = document.querySelector('input#c5[aria-label="Date"], input[aria-label="Date"][jsname="YPqjbf"]');
         const timeInput = document.querySelector('input#c6[aria-label="Time"], input[aria-label="Time"][jsname="YPqjbf"]');
-        
-        log(`Attempt ${attempt}: Date input found: ${!!dateInput}, Time input found: ${!!timeInput}`);
         
         if (dateInput && timeInput) {
           try {
@@ -195,7 +174,6 @@
             const timeStr = `${hours12}:${minutes} ${ampm}`;
             
             // Set the date input
-            log('Setting date input to:', dateStr);
             dateInput.focus();
             dateInput.value = dateStr;
             dateInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -207,7 +185,6 @@
             
             // Set the time input
             setTimeout(() => {
-              log('Setting time input to:', timeStr);
               timeInput.focus();
               timeInput.value = timeStr;
               timeInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -224,22 +201,17 @@
                 )?.closest('button');
                 
                 if (scheduleButton) {
-                  log('Found Schedule send button, clicking it');
                   scheduleButton.click();
-                } else {
-                  log('Schedule send button not found');
                 }
               }, 300);
             }, 200);
             
             return; // Success
           } catch (err) {
-            log('Error setting date/time inputs:', err);
+            // Error setting date/time inputs
           }
         } else if (attempt < maxAttempts) {
           tryToSetDate(attempt + 1, maxAttempts);
-        } else {
-          log('Max attempts reached, date/time inputs not found');
         }
       }, 200 * attempt);
     };
@@ -258,8 +230,6 @@
     }
 
     // Check if we already added the option in THIS specific menu
-    // Use a data attribute on the menu itself to track injection
-    // This prevents race conditions with async chrome.storage calls
     if (datePickerMenu.dataset.lastCancelledInjected === 'true' || 
         datePickerMenu.querySelector('.last-cancelled-time-option')) {
       return; // Already injected in this menu instance
@@ -274,7 +244,7 @@
     }
 
     // Check if we have a saved scheduled time from chrome.storage
-    chrome.storage.local.get(['scheduled time'], (result) => {
+    chrome.storage.local.get(['scheduled time', 'scheduled time iso'], (result) => {
       // Double-check the menu still exists and hasn't been recreated
       const currentMenu = document.querySelector('.ZkmAeb[role="menu"]');
       if (!currentMenu || currentMenu !== datePickerMenu) {
@@ -288,7 +258,8 @@
         return; // Already injected
       }
       
-      const savedTimeStr = result['scheduled time'];
+      // Prefer ISO format if available, fallback to string
+      const savedTimeStr = result['scheduled time iso'] || result['scheduled time'];
       
       if (!savedTimeStr) {
         // Reset flag if we're not injecting
@@ -299,29 +270,64 @@
       // Parse the saved time and check if it's in the future
       let savedTimeDate;
       try {
-        savedTimeDate = new Date(savedTimeStr);
+        // If we have ISO format, use it directly
+        if (result['scheduled time iso']) {
+          savedTimeDate = new Date(result['scheduled time iso']);
+        } else {
+          // Try parsing as-is first
+          savedTimeDate = new Date(savedTimeStr);
+          
+          // If that fails, try to parse common Gmail date formats
+          if (isNaN(savedTimeDate.getTime())) {
+            const now = new Date();
+            const timeMatch = savedTimeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (timeMatch) {
+              let hours = parseInt(timeMatch[1]);
+              const minutes = parseInt(timeMatch[2]);
+              const ampm = timeMatch[3].toUpperCase();
+              
+              if (ampm === 'PM' && hours !== 12) hours += 12;
+              if (ampm === 'AM' && hours === 12) hours = 0;
+              
+              // Check if it says "Tomorrow"
+              if (savedTimeStr.toLowerCase().includes('tomorrow')) {
+                savedTimeDate = new Date(now);
+                savedTimeDate.setDate(savedTimeDate.getDate() + 1);
+                savedTimeDate.setHours(hours, minutes, 0, 0);
+              } else {
+                // Try to parse as a date string
+                savedTimeDate = new Date(savedTimeStr);
+              }
+            }
+          }
+        }
+        
         if (isNaN(savedTimeDate.getTime())) {
-          log('Invalid saved time format:', savedTimeStr);
+          // Clear invalid time from storage
+          chrome.storage.local.remove(['scheduled time', 'scheduled time iso']);
           datePickerMenu.dataset.lastCancelledInjected = '';
           return;
         }
       } catch (e) {
-        log('Error parsing saved time:', e);
         datePickerMenu.dataset.lastCancelledInjected = '';
         return;
       }
       
       // Check if current time is ahead of (after) the saved time
       const now = new Date();
+      
       if (now >= savedTimeDate) {
-        log('Saved time is in the past, not displaying option. Current:', now, 'Saved:', savedTimeDate);
+        // Clear past time from storage
+        chrome.storage.local.remove(['scheduled time', 'scheduled time iso']);
         // Reset flag if we're not injecting
         datePickerMenu.dataset.lastCancelledInjected = '';
         return; // Don't show past times
       }
       
       // Time is in the future, inject it
-      injectMenuItemWithTime(datePickerMenu, firstMenuItem, savedTimeStr);
+      // Use ISO format if available for better reliability, otherwise use the string
+      const timeToUse = result['scheduled time iso'] || savedTimeStr;
+      injectMenuItemWithTime(datePickerMenu, firstMenuItem, timeToUse);
     });
   }
 
@@ -332,7 +338,6 @@
    * @param {string} savedTime - The saved scheduled time
    */
   function injectMenuItemWithTime(datePickerMenu, firstMenuItem, savedTime) {
-
     // Clone the first menu item structure DEEPLY (including all attributes and data)
     const newMenuItem = firstMenuItem.cloneNode(true);
     newMenuItem.classList.add('last-cancelled-time-option');
@@ -359,7 +364,17 @@
       titleDiv.textContent = 'Last cancelled time';
     }
     if (timeDiv) {
-      timeDiv.textContent = savedTime;
+      // Format the time for display if it's a valid date
+      let displayTime = savedTime;
+      try {
+        const parsedDate = new Date(savedTime);
+        if (!isNaN(parsedDate.getTime())) {
+          displayTime = formatTimeForDisplay(parsedDate);
+        }
+      } catch (e) {
+        // Could not format time, using raw value
+      }
+      timeDiv.textContent = displayTime;
     }
 
     // Set autofocus and tabindex like the first item
@@ -372,38 +387,16 @@
       firstMenuItem.setAttribute('tabindex', '-1');
     }
 
-    // First, let's spy on a real menu item to understand what happens
-    if (firstMenuItem && !firstMenuItem.dataset.spied) {
-      firstMenuItem.dataset.spied = 'true';
-      firstMenuItem.addEventListener('click', (e) => {
-        log('Real menu item clicked - inspecting event:', {
-          target: e.target,
-          currentTarget: e.currentTarget,
-          bubbles: e.bubbles,
-          cancelable: e.cancelable,
-          detail: e.detail
-        });
-        log('Real menu item element:', firstMenuItem);
-        log('Real menu item attributes:', Array.from(firstMenuItem.attributes).map(attr => `${attr.name}="${attr.value}"`));
-        log('Real menu item classes:', firstMenuItem.className);
-      }, true); // Use capture phase
-    }
-
     // Add click handler to fill in the date/time picker with saved time
     newMenuItem.addEventListener('click', (e) => {
-      log('Last cancelled time option clicked, time:', savedTime);
-      
       // Parse the saved date
       let parsedDate;
       try {
         parsedDate = new Date(savedTime);
         if (isNaN(parsedDate.getTime())) {
-          log('Failed to parse date:', savedTime);
           return;
         }
-        log('Parsed date:', parsedDate);
       } catch (err) {
-        log('Error parsing date:', err);
         return;
       }
       
@@ -413,7 +406,7 @@
     
     // Also handle mousedown - Gmail might listen to this
     newMenuItem.addEventListener('mousedown', (e) => {
-      log('Last cancelled time option mousedown');
+      // Handle mousedown if needed
     }, false);
 
     // Insert after "Tomorrow morning random" if it exists, otherwise at the beginning
@@ -426,8 +419,6 @@
     
     // Mark this menu as having the option injected
     datePickerMenu.dataset.lastCancelledInjected = 'true';
-    
-    log('Injected last cancelled send time option into date picker');
   }
 
   /**
@@ -441,12 +432,11 @@
     }
 
     // Check if we already added the option in THIS specific menu
-    // Use a data attribute on the menu itself to track injection
     if (datePickerMenu.dataset.tomorrowRandomInjected === 'true') {
       return; // Already injected in this menu instance
     }
     
-    // Also check if the element exists (belt and suspenders)
+    // Also check if the element exists
     if (datePickerMenu.querySelector('.tomorrow-morning-random-option')) {
       datePickerMenu.dataset.tomorrowRandomInjected = 'true';
       return; // Already injected in this menu
@@ -491,14 +481,14 @@
       titleDiv.textContent = 'Tomorrow morning random';
     }
     if (timeDiv) {
-      // Clear any existing content first (Gmail might have pre-populated it)
+      // Clear any existing content first
       timeDiv.textContent = '';
       
-      // Create a text node container for the time (so we can update just the text)
+      // Create a text node container for the time
       const timeTextNode = document.createTextNode(displayTime);
       timeDiv.appendChild(timeTextNode);
       
-      // Create refresh button (positioned absolutely in the reserved space)
+      // Create refresh button
       const refreshBtn = document.createElement('span');
       refreshBtn.className = 'random-time-refresh-btn';
       refreshBtn.setAttribute('aria-label', 'Get new random time');
@@ -517,17 +507,15 @@
         // Update stored time
         newMenuItem.dataset.randomTime = newTime.getTime().toString();
         
-        // Update display - replace just the text node, not all content
+        // Update display
         timeTextNode.textContent = newDisplayTime;
-        
-        log('Random time refreshed:', newDisplayTime);
       });
       
-      // Append refresh button to timeDiv (will be positioned by CSS)
+      // Append refresh button to timeDiv
       timeDiv.appendChild(refreshBtn);
     }
 
-    // Set tabindex (don't set autofocus for this one)
+    // Set tabindex
     newMenuItem.setAttribute('tabindex', '0');
 
     // Add click handler (for the menu item itself, not the refresh button)
@@ -540,7 +528,6 @@
       
       // Get the current stored time
       const storedTime = new Date(parseInt(newMenuItem.dataset.randomTime));
-      log('Tomorrow morning random option clicked, time:', formatTimeForDisplay(storedTime));
       fillDatePickerAndSchedule(storedTime);
     }, false);
 
@@ -549,8 +536,6 @@
     
     // Mark this menu as having the option injected
     datePickerMenu.dataset.tomorrowRandomInjected = 'true';
-    
-    log('Injected tomorrow morning random option into date picker');
   }
 
   /**
@@ -597,63 +582,14 @@
   }
 
   /**
-   * Checks if we're on a scheduled email page and sets up the cancel button listener
-   */
-  function checkAndSetupCancelButton() {
-    const cancelButton = findCancelSendButton();
-    if (cancelButton) {
-      setupCancelButtonListener();
-    }
-  }
-
-  /**
    * Initializes the extension
    */
   function init() {
-    log('Extension initialized');
-    
-    // Wait a bit for Gmail to fully load
-    setTimeout(() => {
-      checkAndSetupCancelButton();
-    }, 500);
+    // Set up simple cancel button listener
+    setupCancelButtonListener();
 
     // Watch for datetime picker menu
     watchForDateTimePicker();
-
-    // Set up MutationObserver to watch for DOM changes
-    // This handles Gmail's dynamic content loading and Cancel button appearance
-    observer = new MutationObserver(() => {
-      // Debounce rapid DOM changes
-      clearTimeout(observer.timeout);
-      observer.timeout = setTimeout(() => {
-        checkAndSetupCancelButton();
-      }, 200);
-    });
-
-    // Start observing
-    observer.observe(document.body, CONFIG.observerOptions);
-
-    // Also listen for navigation events (Gmail uses History API)
-    const originalPushState = history.pushState;
-    history.pushState = function() {
-      originalPushState.apply(history, arguments);
-      setTimeout(checkAndSetupCancelButton, 800);
-    };
-
-    const originalReplaceState = history.replaceState;
-    history.replaceState = function() {
-      originalReplaceState.apply(history, arguments);
-      setTimeout(checkAndSetupCancelButton, 800);
-    };
-
-    window.addEventListener('popstate', () => {
-      setTimeout(checkAndSetupCancelButton, 800);
-    });
-
-    // Periodic check as fallback (in case MutationObserver misses something)
-    setInterval(() => {
-      checkAndSetupCancelButton();
-    }, 3000);
   }
 
   // Wait for DOM to be ready

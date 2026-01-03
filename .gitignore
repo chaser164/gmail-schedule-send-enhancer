@@ -17,3 +17,7 @@ Thumbs.db
 node_modules/
 package-lock.json
 yarn.lock
+
+# scratch work
+PERMISSION_JUSTIFICATIONS.txt
+STORE_DESCRIPTION.txt

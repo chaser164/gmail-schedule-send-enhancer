@@ -1,0 +1,36 @@
+<svg width="512" height="512" viewBox="0 0 512 512"
+     xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#ffffff"/>
+
+  <!-- Gmail-style M -->
+  <path
+    d="M96 160
+       L160 160
+       L256 272
+       L352 160
+       L416 160
+       L416 352
+       L352 352
+       L352 224
+       L256 320
+       L160 224
+       L160 352
+       L96 352 Z"
+    fill="#D93025"/>
+
+  <!-- Clock background -->
+  <circle cx="360" cy="152" r="72" fill="#ffffff" stroke="#D93025" stroke-width="12"/>
+
+  <!-- Clock hands -->
+  <line x1="360" y1="152" x2="360" y2="112"
+        stroke="#D93025" stroke-width="10" stroke-linecap="round"/>
+
+  <line x1="360" y1="152" x2="392" y2="152"
+        stroke="#D93025" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Clock center -->
+  <circle cx="360" cy="152" r="6" fill="#D93025"/>
+
+</svg>
