@@ -2,9 +2,8 @@
   "manifest_version": 3,
   "name": "Gmail Schedule Send Enhancer",
   "version": "1.0.0",
-  "description": "Enhances Gmail's schedule send feature with saved cancelled times and convenient scheduling options",
+  "description": "Enhances Gmail's schedule send feature with saved cancelled times and randomized scheduling options",
   "permissions": [
-    "activeTab",
     "storage"
   ],
   "host_permissions": [

@@ -1,6 +1,6 @@
 # Gmail Schedule Send Enhancer
 
-A Chrome extension that enhances Gmail's schedule send functionality by saving cancelled scheduled times and adding convenient scheduling options to the date picker menu.
+A Chrome extension that enhances Gmail's schedule send functionality by saving cancelled scheduled times and adding randomized scheduling options to the date picker menu.
 
 ## Features
 
